@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock, Paper, Scissors Game</title>
+</head>
+<body>
+    <h1>ALLES, ALLES, ALLES Game</h1>
+    <p>Enter an item to challenge the current winning item. The AI will determine the winner. The first Battle is against Fire!</p>
+	<p id="currentWinningItem">Current Winning Item: Fire</p>
+    <input type="text" id="userInput" placeholder="Type any item">
+    <button onclick="playGame()">Send</button>
+    <p id="result"></p>
+    <script>
+        let lastWinningItem = "fire";
+
+        async function initializeChatSession() {
+            if (!window.chatSession) {
+                try {
+                    const canCreate = await window.ai.canCreateTextSession();
+                    if (canCreate === "readily") {
+                        console.log("Starting chat session");
+                        window.chatSession = await window.ai.createTextSession();
+                        console.log("Chat session created");
+                    } else {
+                        console.error("AI session cannot be created: " + canCreate);
+                    }
+                } catch (error) {
+                    console.error("Error initializing chat session:", error);
+                }
+            }
+        }
+
+        async function askLocalGPTStreaming(promptText) {
+            if (!window.chatSession) {
+                console.error("Chat session not initialized.");
+                return;
+            }
+            
+            try {
+                const stream = window.chatSession.promptStreaming(promptText);
+                let result = '';
+                let previousLength = 0;
+                for await (const chunk of stream) {
+                    const newContent = chunk.slice(previousLength);
+                    result += newContent;
+                    previousLength = chunk.length;
+                    document.getElementById('result').innerText = result;
+                }
+                return result;
+            } catch (error) {
+                console.error("Error communicating with AI:", error);
+                document.getElementById('result').innerText = "An error occurred while communicating with the AI.";
+                return null;
+            }
+        }
+
+        async function playGame() {
+            await initializeChatSession();
+
+            const userInput = document.getElementById('userInput').value.toLowerCase().trim();
+
+            const prompt = `We are playing a game where you decide the winner between two items based on logical reasoning. 
+            
+            Now, the battle is between ${lastWinningItem} and ${userInput}. 
+            
+            Who wins and why? Please respond in the format "Item wins because reason."`;
+
+            const aiResponse = await askLocalGPTStreaming(prompt);
+            
+            if (aiResponse) {
+                const winningItemMatch = aiResponse.match(/(.*?) wins because/i);
+                if (winningItemMatch) {
+                    lastWinningItem = winningItemMatch[1].trim().toLowerCase();
+                } else {
+                    lastWinningItem = userInput;
+                }
+            }
+			
+			document.getElementById('currentWinningItem').innerText = `Current Winning Item: ${lastWinningItem.charAt(0).toUpperCase() + lastWinningItem.slice(1)}`;
+
+        }
+
+        window.onload = initializeChatSession;
+    </script>
+</body>
+</html>
